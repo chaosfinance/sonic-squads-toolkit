@@ -12,6 +12,7 @@ import {
   validateRpcUrl,
   validateMembers,
   validateThreshold,
+  validatePublicKey,
 } from "./utils/validators";
 import { createConsola } from "consola";
 
@@ -39,6 +40,9 @@ const { values } = parseArgs({
     },
     threshold: {
       type: "string", // parseArgs only accepts string, we'll convert to number later
+    },
+    config_authority: {
+      type: "string",
     },
   },
   strict: true,
@@ -69,6 +73,19 @@ export async function executeCreateMultisig() {
   } catch (error) {
     logger.error("Failed to load keypair:", (error as Error).message);
     process.exit(1);
+  }
+
+  let configAuthority = null
+  if (values.config_authority) {
+    configAuthority = validatePublicKey(values.config_authority)
+    if (configAuthority == null) {
+      logger.error("Invalid pubkey for config authority");
+      process.exit(1);
+    }
+    logger.info("config authority pubkey:", configAuthority.toBase58());
+    logger.warn("Creating a CONTROLLED multisig -- only config authority have permission to config the multisig");
+  } else {
+    logger.warn("Creating a AUTONOMOUS multisig -- every config change goes through the normal process of voting by the members");
   }
 
   // Validate additional members
@@ -121,7 +138,7 @@ export async function executeCreateMultisig() {
     ADMIN_KEYPAIR.publicKey,
     seedKeypair.publicKey,
     ADMIN_KEYPAIR.publicKey,
-    ADMIN_KEYPAIR.publicKey,
+    configAuthority,
     0,
     members,
     threshold,
